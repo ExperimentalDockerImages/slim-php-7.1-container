@@ -18,7 +18,6 @@ RUN apt-get update && apt-get install -y \
 		libsqlite3-0 \
 		libxml2 \
 		xz-utils \
-		libcurl4-openssl \
 	--no-install-recommends && rm -r /var/lib/apt/lists/*
 
 ENV PHP_INI_DIR /usr/local/etc/php
@@ -119,7 +118,13 @@ RUN set -xe \
 	&& { find /usr/local/bin /usr/local/sbin -type f -executable -exec strip --strip-all '{}' + || true; } \
 	&& make clean \
 	&& docker-php-source delete \
-	&& apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $buildDeps
+	&& apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false " \
+                                                                                    		$PHP_EXTRA_BUILD_DEPS \
+                                                                                    		libedit-dev \
+                                                                                    		libsqlite3-dev \
+                                                                                    		libssl-dev \
+                                                                                    		libxml2-dev \
+                                                                                    	"
 
 
 
