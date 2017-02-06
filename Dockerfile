@@ -1,5 +1,7 @@
 FROM fzmemoria/base
 
+ENV DEBIAN_FRONTEND noninteractive
+
 # persistent / runtime deps
 ENV PHPIZE_DEPS \
 		autoconf \
@@ -78,16 +80,17 @@ RUN set -xe; \
 
 COPY config/docker-php-source /usr/local/bin/
 
+RUN apt-get update && apt-get install -y --no-install-recommends apt-utils
+
 RUN set -xe \
-	&& buildDeps=" \
-		$PHP_EXTRA_BUILD_DEPS \
+	&& buildDeps=" \		
 		libedit-dev \
 		libsqlite3-dev \
 		libssl-dev \
 		libxml2-dev \
 		libcurl4-openssl-dev \
 	" \
-	&& apt-get update && apt-get install -y $buildDeps --no-install-recommends && rm -rf /var/lib/apt/lists/* \
+	&& apt-get update && apt-get install -y $buildDeps --no-install-recommends \
 	\
 	&& export CFLAGS="$PHP_CFLAGS" \
 		CPPFLAGS="$PHP_CPPFLAGS" \
@@ -118,15 +121,10 @@ RUN set -xe \
 	&& { find /usr/local/bin /usr/local/sbin -type f -executable -exec strip --strip-all '{}' + || true; } \
 	&& make clean \
 	&& docker-php-source delete \
-	&& apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false " \
-                                                                                    		$PHP_EXTRA_BUILD_DEPS \
-                                                                                    		libedit-dev \
-                                                                                    		libsqlite3-dev \
-                                                                                    		libssl-dev \
-                                                                                    		libxml2-dev \
-                                                                                    	"
+	&& apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false libedit-dev libsqlite3-dev libssl-dev libxml2-dev \
+	&& rm -rf /var/lib/apt/lists/*
 
-
+RUN mkdir -p $PHP_INI_DIR/mods-available/
 
 COPY config/docker-php-ext-* config/docker-php-entrypoint /usr/local/bin/
 
@@ -170,5 +168,32 @@ RUN set -ex \
 		echo 'listen = [::]:9000'; \
 	} | tee php-fpm.d/zz-docker.conf
 
+ENV DEBIAN_FRONTEND teletype
+
+RUN set -xe \
+	&& buildDeps=" \
+		wget \
+		unzip \
+		re2c \
+		libgearman-dev \
+	" \
+	&& apt-get update && apt-get install -y $buildDeps --no-install-recommends \
+	\	
+	&& mkdir -p /tmp/install \
+	&& cd /tmp/install \
+	&& wget https://github.com/wcgallego/pecl-gearman/archive/master.zip \
+	&& unzip master.zip \
+	&& cd pecl-gearman-master \
+	&& phpize \
+	&& ./configure \			
+	&& make install \
+	&& echo "extension=gearman.so" > $PHP_INI_DIR/mods-available/gearman.ini \
+	&& docker-php-ext-enable gearman \
+	&& rm -rf /tmp/install/pecl-gearman-master \
+	&& rm -rf /tmp/install/master.zip \
+	&& apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false wget unzip re2c \
+	&& rm -rf /var/lib/apt/lists/*
+
 EXPOSE 9000
+
 CMD ["php-fpm"]
