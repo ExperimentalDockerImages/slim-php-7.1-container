@@ -1,4 +1,4 @@
-FROM fzmemoria/base
+FROM decebal2dac/slim-dev-base
 
 ENV DEBIAN_FRONTEND noninteractive
 
